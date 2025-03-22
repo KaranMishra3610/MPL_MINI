@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../services/order_service.dart';
 import '../services/wallet_service.dart';
+import '../screens/auth_screen.dart'; // Updated to AuthScreen
 
 class CartScreen extends StatefulWidget {
   final String userEmail;
@@ -65,50 +67,72 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
+  void _logout() async {
+    await FirebaseAuth.instance.signOut();
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => AuthScreen()), // Updated to AuthScreen
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Cart")),
+      appBar: AppBar(
+        title: const Text("Cart"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.account_balance_wallet),
+            onPressed: () {}, // Wallet functionality here
+          ),
+          IconButton(
+            icon: const Icon(Icons.shopping_cart),
+            onPressed: () {}, // Cart functionality here
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: _logout,
+          ),
+        ],
+      ),
       body: _orders.isEmpty
           ? const Center(child: Text("Your cart is empty"))
-          : ListView.builder(
-        itemCount: _orders.length,
-        itemBuilder: (context, index) {
-          var order = _orders[index];
-          return Card(
-            margin: const EdgeInsets.all(8.0),
-            child: ExpansionTile(
-              title: Text("Order ID: ${order['orderId']}"),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("Total Price: ₹${order['totalPrice']}"),
-                  Text("Total Items: ${order['totalQuantity']}"),
-                ],
-              ),
-              trailing: Text(
-                order['unpaidTotal'] > 0 ? "Unpaid" : "Paid",
-                style: TextStyle(
-                  color: order['unpaidTotal'] > 0 ? Colors.red : Colors.green,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              children: order['items']
-                  .map<Widget>((item) => ListTile(
-                title: Text(item['name']),
-                subtitle: Text("Price: ₹${item['price']} x ${item['unpaidQuantity']}"),
-              ))
-                  .toList(),
+          : Column(
+        children: [
+          Expanded(
+            child: ListView.builder(
+              itemCount: _orders.length,
+              itemBuilder: (context, index) {
+                var order = _orders[index];
+                return ExpansionTile(
+                  title: Text("Order ID: ${order['orderId']}"),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("Total Price: ₹${order['totalPrice']}"),
+                      Text("Total Items: ${order['totalQuantity']}"),
+                    ],
+                  ),
+                  children: (order['items'] as List<dynamic>).map<Widget>((item) {
+                    return ListTile(
+                      title: Text(item['name']),
+                      subtitle: Text("Price: ₹${item['price']} x ${item['unpaidQuantity']}"),
+                    );
+                  }).toList(),
+                );
+              },
             ),
-          );
-        },
-      ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: ElevatedButton(
-          onPressed: _payWithWallet,
-          child: const Text("Pay with Wallet"),
-        ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: ElevatedButton(
+              onPressed: _payWithWallet,
+              child: const Text("Pay with Wallet"),
+            ),
+          ),
+        ],
       ),
     );
   }
