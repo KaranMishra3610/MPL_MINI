@@ -6,7 +6,7 @@ class OrderService {
 
   Future<void> addToCart(String userEmail, String name, int quantity, double price, String orderId) async {
     DocumentReference itemRef =
-    cartCollection.doc(userEmail).collection("items").doc(name);
+    cartCollection.doc(userEmail).collection("items").doc("${orderId}_$name");
 
     DocumentSnapshot doc = await itemRef.get();
 
@@ -87,4 +87,3 @@ class OrderService {
     }
   }
 }
-
