@@ -71,41 +71,44 @@ class _CartScreenState extends State<CartScreen> {
       appBar: AppBar(title: const Text("Cart")),
       body: _orders.isEmpty
           ? const Center(child: Text("Your cart is empty"))
-          : Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              itemCount: _orders.length,
-              itemBuilder: (context, index) {
-                var order = _orders[index];
-                return ListTile(
-                  title: Text("Order ID: ${order['orderId']}"),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Total Price: ₹${order['totalPrice']}"),
-                      Text("Total Items: ${order['totalQuantity']}"),
-                    ],
-                  ),
-                  trailing: Text(
-                    order['unpaidTotal'] > 0 ? "Unpaid" : "Paid",
-                    style: TextStyle(
-                      color: order['unpaidTotal'] > 0 ? Colors.red : Colors.green,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                );
-              },
+          : ListView.builder(
+        itemCount: _orders.length,
+        itemBuilder: (context, index) {
+          var order = _orders[index];
+          return Card(
+            margin: const EdgeInsets.all(8.0),
+            child: ExpansionTile(
+              title: Text("Order ID: ${order['orderId']}"),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("Total Price: ₹${order['totalPrice']}"),
+                  Text("Total Items: ${order['totalQuantity']}"),
+                ],
+              ),
+              trailing: Text(
+                order['unpaidTotal'] > 0 ? "Unpaid" : "Paid",
+                style: TextStyle(
+                  color: order['unpaidTotal'] > 0 ? Colors.red : Colors.green,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              children: order['items']
+                  .map<Widget>((item) => ListTile(
+                title: Text(item['name']),
+                subtitle: Text("Price: ₹${item['price']} x ${item['unpaidQuantity']}"),
+              ))
+                  .toList(),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: ElevatedButton(
-              onPressed: _payWithWallet,
-              child: const Text("Pay with Wallet"),
-            ),
-          ),
-        ],
+          );
+        },
+      ),
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: ElevatedButton(
+          onPressed: _payWithWallet,
+          child: const Text("Pay with Wallet"),
+        ),
       ),
     );
   }
