@@ -46,11 +46,13 @@ class _MenuScreenState extends State<MenuScreen> {
     if (itemQuantities.isEmpty || itemQuantities.values.every((q) => q == 0)) return;
 
     String orderId = generateOrderId();
-    for (var entry in itemQuantities.entries) {
-      String itemName = entry.key;
-      int quantity = entry.value;
+    for (var item in menuItems) {
+      String itemName = item["name"];
+      double itemPrice = item["price"];
+      int quantity = itemQuantities[itemName] ?? 0;
+
       if (quantity > 0) {
-        await _orderService.addToCart(widget.userEmail, itemName, quantity, orderId);
+        await _orderService.addToCart(widget.userEmail, itemName, quantity, itemPrice, orderId);
       }
     }
 
@@ -161,4 +163,3 @@ class _MenuScreenState extends State<MenuScreen> {
     );
   }
 }
-
