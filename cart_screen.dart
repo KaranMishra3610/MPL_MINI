@@ -13,22 +13,21 @@ class CartScreen extends StatefulWidget {
 class _CartScreenState extends State<CartScreen> {
   final OrderService _orderService = OrderService();
   final WalletService _walletService = WalletService();
-  List<Map<String, dynamic>> _cartItems = [];
+  List<Map<String, dynamic>> _orders = [];
   double _walletBalance = 0.0;
 
   @override
   void initState() {
     super.initState();
-    _fetchCartItems();
+    _fetchOrders();
     _fetchWalletBalance();
   }
 
-  Future<void> _fetchCartItems() async {
-    List<Map<String, dynamic>> items =
-    await _orderService.getCartItems(widget.userEmail);
+  Future<void> _fetchOrders() async {
+    List<Map<String, dynamic>> orders = await _orderService.getGroupedOrders(widget.userEmail);
     if (mounted) {
       setState(() {
-        _cartItems = items;
+        _orders = orders;
       });
     }
   }
@@ -43,15 +42,13 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Future<void> _payWithWallet() async {
-    double totalUnpaid = _cartItems.fold(
-        0.0, (sum, item) => sum + (item['price'] * item['unpaidQuantity']));
+    double totalUnpaid = _orders.fold(0.0, (sum, order) => sum + (order['unpaidTotal']));
 
     if (totalUnpaid > 0 && _walletBalance >= totalUnpaid) {
-      bool success =
-      await _walletService.deductMoney(widget.userEmail, totalUnpaid);
+      bool success = await _walletService.deductMoney(widget.userEmail, totalUnpaid);
       if (success) {
         await _orderService.markOrdersPaid(widget.userEmail, totalUnpaid);
-        _fetchCartItems();
+        _fetchOrders();
         _fetchWalletBalance();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Payment Successful!")),
@@ -72,33 +69,30 @@ class _CartScreenState extends State<CartScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Cart")),
-      body: _cartItems.isEmpty
+      body: _orders.isEmpty
           ? const Center(child: Text("Your cart is empty"))
           : Column(
         children: [
           Expanded(
             child: ListView.builder(
-              itemCount: _cartItems.length,
+              itemCount: _orders.length,
               itemBuilder: (context, index) {
-                var item = _cartItems[index];
+                var order = _orders[index];
                 return ListTile(
-                  title: Text(item['name']),
-                  subtitle: Text(
-                      "Price: ₹${item['price']} x ${item['paidQuantity'] + item['unpaidQuantity']}"),
-                  trailing: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                  title: Text("Order ID: ${order['orderId']}"),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (item['paidQuantity'] > 0)
-                        Text(
-                          "Paid: ${item['paidQuantity']}",
-                          style: const TextStyle(color: Colors.green),
-                        ),
-                      if (item['unpaidQuantity'] > 0)
-                        Text(
-                          "Unpaid: ${item['unpaidQuantity']}",
-                          style: const TextStyle(color: Colors.red),
-                        ),
+                      Text("Total Price: ₹${order['totalPrice']}"),
+                      Text("Total Items: ${order['totalQuantity']}"),
                     ],
+                  ),
+                  trailing: Text(
+                    order['unpaidTotal'] > 0 ? "Unpaid" : "Paid",
+                    style: TextStyle(
+                      color: order['unpaidTotal'] > 0 ? Colors.red : Colors.green,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 );
               },
