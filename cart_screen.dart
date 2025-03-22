@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/order_service.dart';
 import '../services/wallet_service.dart';
-import '../screens/auth_screen.dart'; // Updated to AuthScreen
+import '../screens/auth_screen.dart';
 
 class CartScreen extends StatefulWidget {
   final String userEmail;
@@ -67,12 +68,32 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
+  Future<void> _cancelOrder(String orderId) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection("user_cart")
+          .doc(widget.userEmail)
+          .collection("orders")
+          .doc(orderId)
+          .delete();
+
+      _fetchOrders(); // Refresh UI after deletion
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Order canceled successfully!")),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to cancel order!")),
+      );
+    }
+  }
+
   void _logout() async {
     await FirebaseAuth.instance.signOut();
     if (mounted) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => AuthScreen()), // Updated to AuthScreen
+        MaterialPageRoute(builder: (context) => AuthScreen()),
       );
     }
   }
@@ -85,11 +106,11 @@ class _CartScreenState extends State<CartScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.account_balance_wallet),
-            onPressed: () {}, // Wallet functionality here
+            onPressed: () {},
           ),
           IconButton(
             icon: const Icon(Icons.shopping_cart),
-            onPressed: () {}, // Cart functionality here
+            onPressed: () {},
           ),
           IconButton(
             icon: const Icon(Icons.logout),
@@ -115,12 +136,23 @@ class _CartScreenState extends State<CartScreen> {
                       Text("Total Items: ${order['totalQuantity']}"),
                     ],
                   ),
-                  children: (order['items'] as List<dynamic>).map<Widget>((item) {
-                    return ListTile(
-                      title: Text(item['name']),
-                      subtitle: Text("Price: ₹${item['price']} x ${item['unpaidQuantity']}"),
-                    );
-                  }).toList(),
+                  children: [
+                    Column(
+                      children: (order['items'] as List<dynamic>).map<Widget>((item) {
+                        return ListTile(
+                          title: Text(item['name']),
+                          subtitle: Text("Price: ₹${item['price']} x ${item['unpaidQuantity']}"),
+                        );
+                      }).toList(),
+                    ),
+                    TextButton(
+                      onPressed: () => _cancelOrder(order['orderId']),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.red,
+                      ),
+                      child: const Text("Cancel Order"),
+                    ),
+                  ],
                 );
               },
             ),
