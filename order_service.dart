@@ -4,7 +4,7 @@ class OrderService {
   final CollectionReference cartCollection =
   FirebaseFirestore.instance.collection("user_cart");
 
-  Future<void> addToCart(String userEmail, String name,int quantity, double price,String orderId) async {
+  Future<void> addToCart(String userEmail, String name, int quantity, double price, String orderId) async {
     DocumentReference itemRef =
     cartCollection.doc(userEmail).collection("items").doc(name);
 
@@ -13,54 +13,48 @@ class OrderService {
     if (doc.exists) {
       Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
       int unpaidQty = data['unpaidQuantity'] ?? 0;
-      await itemRef.update({"unpaidQuantity": unpaidQty + 1});
+      await itemRef.update({"unpaidQuantity": unpaidQty + quantity});
     } else {
       await itemRef.set({
         "name": name,
         "price": price,
+        "orderId": orderId,
         "paidQuantity": 0,
-        "unpaidQuantity": 1
+        "unpaidQuantity": quantity
       });
     }
   }
 
-  Future<void> updateQuantity(String userEmail, String name, int change) async {
-    DocumentReference itemRef =
-    cartCollection.doc(userEmail).collection("items").doc(name);
-
-    DocumentSnapshot doc = await itemRef.get();
-    if (doc.exists) {
-      Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-      int unpaidQty = data['unpaidQuantity'] ?? 0;
-      int paidQty = data['paidQuantity'] ?? 0;
-      int newUnpaidQty = unpaidQty + change;
-
-      if (newUnpaidQty > 0) {
-        await itemRef.update({"unpaidQuantity": newUnpaidQty});
-      } else {
-        if (paidQty > 0) {
-          await itemRef.update({"unpaidQuantity": 0});
-        } else {
-          await itemRef.delete();
-        }
-      }
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> getCartItems(String userEmail) async {
+  Future<List<Map<String, dynamic>>> getGroupedOrders(String userEmail) async {
     QuerySnapshot snapshot =
     await cartCollection.doc(userEmail).collection("items").get();
 
-    return snapshot.docs.map((doc) {
-      Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+    Map<String, Map<String, dynamic>> orders = {};
 
-      return {
-        "name": data["name"] ?? "Unknown",
-        "price": data["price"] ?? 0.0,
-        "paidQuantity": data["paidQuantity"] ?? 0,
-        "unpaidQuantity": data["unpaidQuantity"] ?? 0,
-      };
-    }).toList();
+    for (var doc in snapshot.docs) {
+      Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+      String orderId = data["orderId"] ?? "Unknown";
+      double price = data["price"] ?? 0.0;
+      int paidQty = data["paidQuantity"] ?? 0;
+      int unpaidQty = data["unpaidQuantity"] ?? 0;
+      double itemTotal = price * (paidQty + unpaidQty);
+      double unpaidTotal = price * unpaidQty;
+
+      if (orders.containsKey(orderId)) {
+        orders[orderId]!["totalQuantity"] += paidQty + unpaidQty;
+        orders[orderId]!["totalPrice"] += itemTotal;
+        orders[orderId]!["unpaidTotal"] += unpaidTotal;
+      } else {
+        orders[orderId] = {
+          "orderId": orderId,
+          "totalQuantity": paidQty + unpaidQty,
+          "totalPrice": itemTotal,
+          "unpaidTotal": unpaidTotal
+        };
+      }
+    }
+
+    return orders.values.toList();
   }
 
   Future<void> markOrdersPaid(String userEmail, double amountPaid) async {
