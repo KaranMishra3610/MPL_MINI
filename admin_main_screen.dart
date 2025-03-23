@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'auth_screen.dart'; // Ensure this file exists and is correctly imported
+import 'auth_screen.dart';
 
 class AdminMainScreen extends StatefulWidget {
   @override
@@ -10,6 +10,9 @@ class AdminMainScreen extends StatefulWidget {
 }
 
 class _AdminMainScreenState extends State<AdminMainScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  String searchQuery = "";
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -30,6 +33,8 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
           children: [
             const Text("Recent Orders", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
+            _buildSearchBar(),
+            const SizedBox(height: 10),
             Expanded(child: _buildOrderList()),
             const SizedBox(height: 20),
             const Text("Item Popularity Chart", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
@@ -38,6 +43,24 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return TextField(
+      controller: _searchController,
+      decoration: InputDecoration(
+        hintText: "Search by Order ID...",
+        prefixIcon: const Icon(Icons.search),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        filled: true,
+        fillColor: Colors.white,
+      ),
+      onChanged: (value) {
+        setState(() {
+          searchQuery = value.trim().toLowerCase();
+        });
+      },
     );
   }
 
@@ -85,8 +108,14 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
             builder: (context, orderSnapshot) {
               if (!orderSnapshot.hasData) return const SizedBox.shrink();
 
+              var filteredOrders = orderSnapshot.data!.docs.where((orderDoc) {
+                var data = orderDoc.data() as Map<String, dynamic>;
+                String orderId = data['orderId'].toString().toLowerCase();
+                return orderId.contains(searchQuery);
+              }).toList();
+
               return Column(
-                children: orderSnapshot.data!.docs.map((orderDoc) {
+                children: filteredOrders.map((orderDoc) {
                   var data = orderDoc.data() as Map<String, dynamic>;
                   var items = (data["items"] as List<dynamic>? ?? []);
 
@@ -135,7 +164,6 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
         if (!userSnapshot.hasData) return const Center(child: CircularProgressIndicator());
 
         Map<String, int> productCount = {};
-
         List<Future<void>> fetchOrders = [];
 
         for (var userDoc in userSnapshot.data!.docs) {
