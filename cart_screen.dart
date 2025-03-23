@@ -44,15 +44,13 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
-  Future<void> _payWithWallet() async {
-    double totalUnpaid = _orders.fold(0.0, (sum, order) => sum + (order['unpaidTotal']));
-
-    if (totalUnpaid > 0 && _walletBalance >= totalUnpaid) {
-      bool success = await _walletService.deductMoney(widget.userEmail, totalUnpaid);
+  Future<void> _payForOrder(String orderId, double orderTotal) async {
+    if (_walletBalance >= orderTotal) {
+      bool success = await _walletService.deductMoney(widget.userEmail, orderTotal);
       if (success) {
-        await _orderService.markOrdersPaid(widget.userEmail, totalUnpaid);
-        _fetchOrders();
-        _fetchWalletBalance();
+        await _orderService.markOrderPaid(widget.userEmail, orderId);
+        await _fetchOrders();
+        await _fetchWalletBalance();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Payment Successful!")),
         );
@@ -68,19 +66,28 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
-  Future<void> _cancelOrder(String orderId) async {
+  Future<void> _cancelOrder(String orderId, double refundAmount) async {
     try {
-      await FirebaseFirestore.instance
-          .collection("user_cart")
-          .doc(widget.userEmail)
-          .collection("orders")
-          .doc(orderId)
-          .delete();
+      bool refundSuccess = await _walletService.addMoney(widget.userEmail, refundAmount);
 
-      _fetchOrders(); // Refresh UI after deletion
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Order canceled successfully!")),
-      );
+      if (refundSuccess) {
+        await FirebaseFirestore.instance
+            .collection("user_cart")
+            .doc(widget.userEmail)
+            .collection("orders")
+            .doc(orderId)
+            .delete();
+
+        await _fetchOrders();
+        await _fetchWalletBalance();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Order canceled successfully! Amount refunded.")),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to process refund!")),
+        );
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Failed to cancel order!")),
@@ -120,51 +127,49 @@ class _CartScreenState extends State<CartScreen> {
       ),
       body: _orders.isEmpty
           ? const Center(child: Text("Your cart is empty"))
-          : Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              itemCount: _orders.length,
-              itemBuilder: (context, index) {
-                var order = _orders[index];
-                return ExpansionTile(
-                  title: Text("Order ID: ${order['orderId']}"),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Total Price: ₹${order['totalPrice']}"),
-                      Text("Total Items: ${order['totalQuantity']}"),
-                    ],
-                  ),
+          : ListView.builder(
+        itemCount: _orders.length,
+        itemBuilder: (context, index) {
+          var order = _orders[index];
+          return Card(
+            margin: const EdgeInsets.all(8.0),
+            child: ExpansionTile(
+              title: Text("Order ID: ${order['orderId']}"),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("Total Price: ₹${order['totalPrice']}"),
+                  Text("Total Items: ${order['totalQuantity']}"),
+                ],
+              ),
+              children: [
+                Column(
+                  children: (order['items'] as List<dynamic>).map<Widget>((item) {
+                    return ListTile(
+                      title: Text(item['name']),
+                      subtitle: Text("Price: ₹${item['price']} x ${item['unpaidQuantity']}"),
+                    );
+                  }).toList(),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    Column(
-                      children: (order['items'] as List<dynamic>).map<Widget>((item) {
-                        return ListTile(
-                          title: Text(item['name']),
-                          subtitle: Text("Price: ₹${item['price']} x ${item['unpaidQuantity']}"),
-                        );
-                      }).toList(),
+                    ElevatedButton(
+                      onPressed: () => _payForOrder(order['orderId'], order['unpaidTotal']),
+                      child: const Text("Pay with Wallet"),
                     ),
                     TextButton(
-                      onPressed: () => _cancelOrder(order['orderId']),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.red,
-                      ),
+                      onPressed: () => _cancelOrder(order['orderId'], order['unpaidTotal']),
+                      style: TextButton.styleFrom(foregroundColor: Colors.red),
                       child: const Text("Cancel Order"),
                     ),
                   ],
-                );
-              },
+                ),
+                const SizedBox(height: 10),
+              ],
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: ElevatedButton(
-              onPressed: _payWithWallet,
-              child: const Text("Pay with Wallet"),
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
