@@ -4,8 +4,10 @@ class OrderService {
   final CollectionReference cartCollection =
   FirebaseFirestore.instance.collection("user_cart");
 
-  Future<void> addToCart(String userEmail, String name, int quantity, double price, String orderId) async {
-    DocumentReference orderRef = cartCollection.doc(userEmail).collection("orders").doc(orderId);
+  Future<void> addToCart(
+      String userEmail, String name, int quantity, double price, String orderId) async {
+    DocumentReference orderRef =
+    cartCollection.doc(userEmail).collection("orders").doc(orderId);
     DocumentSnapshot orderDoc = await orderRef.get();
 
     if (orderDoc.exists) {
@@ -62,8 +64,11 @@ class OrderService {
   }
 
   Future<List<Map<String, dynamic>>> getGroupedOrders(String userEmail) async {
-    QuerySnapshot snapshot = await cartCollection.doc(userEmail).collection("orders").get();
-    return snapshot.docs.map((doc) => doc.data() as Map<String, dynamic>).toList();
+    QuerySnapshot snapshot =
+    await cartCollection.doc(userEmail).collection("orders").get();
+    return snapshot.docs
+        .map((doc) => doc.data() as Map<String, dynamic>)
+        .toList();
   }
 
   Future<void> markOrdersPaid(String userEmail, double amountPaid) async {
@@ -79,7 +84,6 @@ class OrderService {
       Map<String, dynamic> orderData = doc.data() as Map<String, dynamic>;
       List<dynamic> items = orderData["items"] ?? [];
       double unpaidTotal = orderData["unpaidTotal"] ?? 0.0;
-      double totalPrice = orderData["totalPrice"] ?? 0.0;
 
       for (var item in items) {
         int unpaidQty = item["unpaidQuantity"] ?? 0;
@@ -104,6 +108,27 @@ class OrderService {
       });
 
       if (remainingBalance <= 0) break;
+    }
+  }
+
+  Future<void> markOrderPaid(String userEmail, String orderId) async {
+    DocumentReference orderRef =
+    cartCollection.doc(userEmail).collection("orders").doc(orderId);
+    DocumentSnapshot orderDoc = await orderRef.get();
+
+    if (orderDoc.exists) {
+      Map<String, dynamic> orderData = orderDoc.data() as Map<String, dynamic>;
+      List<dynamic> items = orderData["items"] ?? [];
+
+      for (var item in items) {
+        item["paidQuantity"] += item["unpaidQuantity"];
+        item["unpaidQuantity"] = 0;
+      }
+
+      await orderRef.update({
+        "items": items,
+        "unpaidTotal": 0,
+      });
     }
   }
 }
